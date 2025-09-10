@@ -76,7 +76,6 @@ npx expo start
 
 ### Android (local / debug)
 
-```bash
 npx expo prebuild
 npx expo run:android
 # or use EAS Build for managed app store builds
