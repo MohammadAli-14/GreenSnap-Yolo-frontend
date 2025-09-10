@@ -87,14 +87,14 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.mohammedali77.mobile'
+    namespace 'com.mohammedali77.greensnapyolo'
     defaultConfig {
-        applicationId 'com.mohammedali77.mobile'
-        minSdkVersion rootProject.ext.minSdkVersion
-        targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0.0"
-    }
+    applicationId 'com.mohammedali77.greensnapyolo'   // <-- change this
+    minSdkVersion 24
+    targetSdkVersion 33
+    versionCode 1
+    versionName "1.0.0"
+}
     signingConfigs {
         debug {
             storeFile file('debug.keystore')

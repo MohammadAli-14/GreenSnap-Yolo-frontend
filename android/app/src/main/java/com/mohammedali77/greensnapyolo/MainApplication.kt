@@ -1,4 +1,4 @@
-package com.mohammedali77.mobile
+package com.mohammedali77.greensnapyolo
 
 import android.app.Application
 import android.content.res.Configuration

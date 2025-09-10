@@ -1,4 +1,4 @@
-package com.mohammedali77.mobile
+package com.mohammedali77.greensnapyolo
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

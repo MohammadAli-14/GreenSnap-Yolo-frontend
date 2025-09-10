@@ -20,6 +20,7 @@ import * as Location from 'expo-location';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import useAuthStore from '../../store/authStore';
 import { API_URL } from '../../constants/api';
+import { Buffer } from 'buffer';
 
 export default function CreateComplaint() {
   const [title, setTitle] = useState("");
@@ -61,21 +62,6 @@ export default function CreateComplaint() {
       }
     })();
   }, []);
-  
-  // Helper to calculate actual image size from base64
-  const getImageBinarySize = (base64Uri) => {
-    if (!base64Uri) return 0;
-    const base64Data = base64Uri.split(',')[1];
-    if (!base64Data) return 0;
-
-    let padding = 0;
-    if (base64Data.endsWith('==')) {
-      padding = 2;
-    } else if (base64Data.endsWith('=')) {
-      padding = 1;
-    }
-    return (base64Data.length * 3) / 4 - padding;
-  };
     
   const captureLocation = async () => {
     try {
@@ -110,70 +96,63 @@ export default function CreateComplaint() {
     }
   };
 
- const takePhoto = async () => {
-  try {
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.7,
-      base64: true,
-      exif: true 
-    });
+  const takePhoto = async () => {
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.7,
+        base64: true,
+        exif: true 
+      });
 
-    if (!result.canceled && result.assets?.length > 0) {
-      const asset = result.assets[0];
-      let timestamp = new Date().toISOString();
+      if (!result.canceled && result.assets?.length > 0) {
+        const asset = result.assets[0];
+        let timestamp = new Date().toISOString();
 
-      // Extract timestamp from EXIF if available
-      if (asset.exif?.DateTimeOriginal) {
-        try {
-          const [date, time] = asset.exif.DateTimeOriginal.split(' ');
-          const [year, month, day] = date.split(':');
-          const [hour, minute, second] = time.split(':');
-          timestamp = new Date(
-            parseInt(year, 10),
-            parseInt(month, 10) - 1,
-            parseInt(day, 10),
-            parseInt(hour, 10),
-            parseInt(minute, 10),
-            parseInt(second, 10)
-          ).toISOString();
-        } catch (e) {
-          console.warn("Failed to parse EXIF date", e);
+        if (asset.exif?.DateTimeOriginal) {
+          try {
+            const [date, time] = asset.exif.DateTimeOriginal.split(' ');
+            const [year, month, day] = date.split(':');
+            const [hour, minute, second] = time.split(':');
+            timestamp = new Date(
+              parseInt(year, 10),
+              parseInt(month, 10) - 1,
+              parseInt(day, 10),
+              parseInt(hour, 10),
+              parseInt(minute, 10),
+              parseInt(second, 10)
+            ).toISOString();
+          } catch (e) {
+            console.warn("Failed to parse EXIF date", e);
+          }
+        }
+
+        const compressedImage = await manipulateAsync(
+          asset.uri,
+          [{ resize: { width: 640 } }],
+          {
+            compress: 0.7,
+            format: SaveFormat.JPEG,
+            base64: true
+          }
+        );
+
+        if (compressedImage.base64) {
+          setImage(compressedImage.uri);
+          setImageBase64(compressedImage.base64);
+          setPhotoTimestamp(timestamp);
+          setClassificationResult(null);
         }
       }
-
-      // Resize + recompress at 0.7 quality, get raw base64
-      const compressedImage = await manipulateAsync(
-        asset.uri,
-        [{ resize: { width: 640 } }],
-        {
-          compress: 0.7,
-          format: SaveFormat.JPEG,
-          base64: true
-        }
+    } catch (error) {
+      console.error("Camera Error:", error);
+      Alert.alert(
+        "Camera Error",
+        "Failed to capture photo. Please try again."
       );
-
-      if (compressedImage.base64) {
-        // Use full data URI format
-        const fullBase64 = `data:image/jpeg;base64,${compressedImage.base64}`;
-        
-        setImage(compressedImage.uri);
-        setImageBase64(fullBase64);
-        setPhotoTimestamp(timestamp);
-        setClassificationResult(null); // Reset previous classification
-        setVerificationMessage(null);
-        setVerificationStatus(null);
-      }
     }
-  } catch (error) {
-    console.error("Camera Error:", error);
-    Alert.alert(
-      "Camera Error",
-      "Failed to capture photo. Please try again."
-    );
-  }
-};
+  };
 
   const validateForm = () => {
     const errors = [];
@@ -187,209 +166,210 @@ export default function CreateComplaint() {
     return errors;
   };
 
-  // Common payload for both normal and forced submits
-  const payloadBase = (classificationResult = null) => ({
-    title: title.trim(),
-    details: details.trim(),
-    address: address.trim(),
-    image: imageBase64,
-    latitude: locationCoords.latitude,
-    longitude: locationCoords.longitude,
-    photoTimestamp,
-    reportType,
-    ...(classificationResult && { classification: classificationResult })
-  });
-
- const testClassification = async () => {
-  try {
-    const pureBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
-    
-    const response = await fetch(`${API_URL}/classify/test`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ image: pureBase64 }),
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Classification error response:", errorText);
-      
-      // Create enhanced error with response details
-      const error = new Error(`Service error: ${response.status} - ${errorText}`);
-      error.responseStatus = response.status;
-      error.responseText = errorText;
-      
-      throw error;
-    }
-
-    const result = await response.json();
-    
-    // Store result for UI or submission use
-    setClassificationResult(result);
-
-    // HIGH CONFIDENCE WASTE REQUIRED
-    const minConfidence = 0.85; // High confidence threshold
-    
-    if (result.isWaste && result.confidence >= minConfidence) {
-      // Set verification status for UI feedback
-      setVerificationStatus("high_confidence");
-      setVerificationMessage("✅ Verified waste - Submitting report...");
-      
-      return true;
-    } else {
-      // Show appropriate message based on classification
-      let message = "Non-waste detected";
-      if (result.isWaste) {
-        message = `Low confidence waste (${(result.confidence * 100).toFixed(1)}%)`;
-      }
-      
-      Alert.alert(
-        "Verification Failed",
-        `${message}. Please capture a clear image of waste.`,
-        [
-          { text: "Retake Photo", onPress: takePhoto }
-        ]
-      );
-      return false;
-    }
-    
-  } catch (error) {
-    console.error("Full classification error:", {
-      message: error.message,
-      stack: error.stack,
-      responseStatus: error.responseStatus,
-      responseText: error.responseText
-    });
-    
-    Alert.alert(
-      "Verification Failed",
-      "AI service is unavailable. Please try again later.",
-      [
-        { text: "OK", onPress: () => {} }
-      ]
-    );
-
-    return false;
-  }
-};
-
-  // Regular submit with AI check
- const handleSubmit = async () => {
-  // Ensure we actually have an image
-  if (!imageBase64) {
-    return Alert.alert("Missing Image", "Please take a photo first");
-  }
-
-  // Calculate actual binary size from base64
-  const imageSize = getImageBinarySize(imageBase64);
-  if (imageSize > 5 * 1024 * 1024) {
-    return Alert.alert("Image Too Large", "Please use a smaller image (<5MB)");
-  }
-
-  // Validate required fields
-  const formErrors = validateForm();
-  if (formErrors.length > 0) {
-    return Alert.alert(
-      "Missing Information",
-      `Please provide: ${formErrors.join(", ")}`
-    );
-  }
-
-  try {
-    setLoading(true);
-    setVerifying(true);
-    setVerificationStatus(null);
-    setVerificationMessage(null);
-
-    // Run AI classification check
-    const isValidWaste = await testClassification();
-    if (!isValidWaste) return;
-
-    // Submit the report with classification data
-    const payload = payloadBase(classificationResult);
-
-    const response = await fetch(`${API_URL}/report`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-
-    // Read raw text to handle edge-case responses
-    const text = await response.text();
-    let data;
+  const testClassification = async () => {
     try {
-      data = JSON.parse(text);
-    } catch (e) {
-      throw new Error(`Invalid response from server: ${text.slice(0, 50)}`);
-    }
-
-    // Handle HTTP errors
-    if (!response.ok) {
-      switch (data.code) {
-        case "NOT_WASTE":
-          return Alert.alert(
-            "Invalid Waste",
-            `AI detected: ${data.classification?.label || "Non-waste"}`
-          );
-        case "LOW_CONFIDENCE":
-          return Alert.alert(
-            "Low Confidence",
-            `AI detected: ${data.classification?.label || "Uncertain"}`
-          );
-        default:
-          return Alert.alert(
-            "Error",
-            data.message || `Server error ${response.status}`
-          );
-      }
-    }
-
-    // Success
-    Alert.alert("Success", "Report submitted successfully!", [
-      {
-        text: "OK",
-        onPress: () => {
-          // reset form
-          setTitle("");
-          setDetails("");
-          setAddress("");
-          setImage(null);
-          setImageBase64(null);
-          setLocationCoords(null);
-          setPhotoTimestamp(null);
-          setReportType("standard");
-          setClassificationResult(null);
-          setVerificationMessage(null);
-          setVerificationStatus(null);
-          router.push("/");
+      const pureBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+      const response = await fetch(`${API_URL}/report/test-classify`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-      },
-    ]);
+        body: JSON.stringify({ image: pureBase64 }),
+      });
 
-  } catch (error) {
-    console.error("Submission Error:", error);
-    let message = error.message || "Failed to submit report";
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Service error: ${response.status} - ${errorText}`);
+      }
 
-    if (message.includes("SERVICE_DOWN")) {
-      message = "AI service is offline. Please try again later.";
-    } else if (message.includes("TIMEOUT")) {
-      message = "Verification took too long. Please try again.";
-    } else if (message.includes("GRADIO_TIMEOUT")) {
-      message = "AI verification took too long. Please try again.";
+      const result = await response.json();
+      setClassificationResult(result);
+      
+      if (result.isVerifiedWaste) {
+        // Auto-submit for high confidence
+        return true;
+      } else if (result.isWaste) {
+        return new Promise((resolve) => {
+          Alert.alert(
+            "Potential Waste Detected",
+            `AI detected waste with ${(result.confidence * 100).toFixed(1)}% confidence.`,
+            [
+              { text: "Retake Photo", onPress: () => resolve(false) },
+              { 
+                text: "Submit Report", 
+                onPress: () => resolve(true)
+              }
+            ]
+          );
+        });
+      } else {
+        return new Promise((resolve) => {
+          Alert.alert(
+            "No Waste Detected",
+            "AI did not detect waste. Please capture a clear image of waste.",
+            [
+              { 
+                text: "Retake Photo", 
+                onPress: () => resolve(false) 
+              }
+            ]
+          );
+        });
+      }
+
+    } catch (error) {
+      console.error("Classification test failed:", error.message);
+      
+      return new Promise((resolve) => {
+        Alert.alert(
+          "Verification Failed",
+          "AI service is unavailable. Submit anyway?",
+          [
+            { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
+            { 
+              text: "Submit Report", 
+              onPress: () => resolve(true)
+            }
+          ]
+        );
+      });
+    }
+  };
+
+  const resetForm = () => {
+    setTitle("");
+    setDetails("");
+    setAddress("");
+    setImage(null);
+    setImageBase64(null);
+    setLocationCoords(null);
+    setPhotoTimestamp(null);
+    setReportType("standard");
+    setClassificationResult(null);
+    router.push("/");
+  };
+
+  const handleSubmit = async () => {
+    if (!imageBase64) {
+      return Alert.alert("Missing Image", "Please take a photo first");
     }
 
-    Alert.alert("Notice", message);
-  } finally {
-    setLoading(false);
-    setVerifying(false);
-  }
-};
+    const maxBytes = 5 * 1024 * 1024;
+    const byteSize = Buffer.byteLength(imageBase64, "base64");
+    if (byteSize > maxBytes) {
+      return Alert.alert(
+        "Image Too Large",
+        `Your photo is ${(byteSize / (1024 * 1024)).toFixed(2)} MB; max is 5 MB.`
+      );
+    }
+
+    const formErrors = validateForm();
+    if (formErrors.length > 0) {
+      return Alert.alert(
+        "Missing Information",
+        `Please provide: ${formErrors.join(", ")}`
+      );
+    }
+
+    try {
+      setLoading(true);
+      setVerifying(true);
+      setVerificationStatus(null);
+      setVerificationMessage(null);
+
+      const shouldProceed = await testClassification();
+      if (!shouldProceed) {
+        setLoading(false);
+        setVerifying(false);
+        return;
+      }
+
+      // Set verification message for high confidence cases
+      if (classificationResult?.isVerifiedWaste) {
+        setVerificationStatus("high_confidence");
+        setVerificationMessage("✅ Verified waste - Submitting report...");
+        await new Promise(resolve => setTimeout(resolve, 1500));
+      }
+
+      const payload = {
+        title: title.trim(),
+        details: details.trim(),
+        address: address.trim(),
+        image: imageBase64,
+        latitude: locationCoords.latitude,
+        longitude: locationCoords.longitude,
+        photoTimestamp,
+        reportType,
+        classification: classificationResult
+      };
+
+      const response = await fetch(`${API_URL}/report`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const responseText = await response.text();
+
+      if (responseText.startsWith("<!DOCTYPE html") || responseText.startsWith("<html")) {
+        throw new Error("Server returned HTML error page");
+      }
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        if (response.ok) {
+          Alert.alert("Success", "Report submitted successfully!");
+          resetForm();
+          return;
+        } else {
+          throw new Error(`Server returned invalid response: ${responseText.slice(0, 100)}`);
+        }
+      }
+
+      if (!response.ok) {
+        let errorMessage = data.message || `Server error ${response.status}`;
+        
+        if (data.code === "NOT_WASTE") {
+          errorMessage = `AI detected: ${data.classification?.label || "Non-waste"}`;
+        } else if (data.code === "LOW_CONFIDENCE") {
+          errorMessage = `Confidence: ${((data.classification?.confidence ?? 0) * 100).toFixed(1)}%`;
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      Alert.alert("Success", "Report submitted successfully!", [
+        {
+          text: "OK",
+          onPress: resetForm
+        },
+      ]);
+
+    } catch (error) {
+      console.error("Submission Error:", error);
+      
+      let message = "Failed to submit report. Please try again later.";
+      
+      if (error.message.includes("HTML error page")) {
+        message = "Server error. Please contact support.";
+      } else if (error.message.includes("Server returned invalid response")) {
+        message = "Unexpected server response. Please try again.";
+      } else if (error.message) {
+        message = error.message;
+      }
+      
+      Alert.alert("Error", message);
+    } finally {
+      setLoading(false);
+      setVerifying(false);
+    }
+  };
 
   return (
     <KeyboardAvoidingView
@@ -528,7 +508,7 @@ export default function CreateComplaint() {
                   style={styles.inputIcon}
                 />
                 <TextInput
-                  style={[styles.input, styles.textArea]}
+                  style={[styles.input, styles.textArea, styles.disabledInput]}
                   placeholder="Address will be captured automatically"
                   placeholderTextColor={COLORS.placeholderText}
                   value={address}
@@ -548,8 +528,6 @@ export default function CreateComplaint() {
                     setImage(null); 
                     setImageBase64(null);
                     setClassificationResult(null);
-                    setVerificationMessage(null);
-                    setVerificationStatus(null);
                   }}>
                     <Text style={styles.refreshLink}>Retake</Text>
                   </TouchableOpacity>
@@ -565,25 +543,19 @@ export default function CreateComplaint() {
                   <View style={styles.imagePreviewContainer}>
                     <Image source={{ uri: image }} style={styles.previewImage} />
 
-                    {/* SIMPLIFIED AI classification badge */}
                     {classificationResult && (
-                      <View style={[
-                        styles.classificationBadge,
-                        classificationResult.isVerifiedWaste && styles.verifiedBadge,
-                        !classificationResult.isWaste && styles.nonWasteBadge
-                      ]}>
-                        <Ionicons 
-                          name={classificationResult.isVerifiedWaste ? "checkmark-circle" : "alert-circle"} 
-                          size={20} 
-                          color={classificationResult.isVerifiedWaste ? "green" : "orange"} 
-                        />
+                      <View style={styles.classificationBadge}>
                         <Text style={styles.badgeText}>
-                          {classificationResult.label}
+                          {classificationResult.label} (
+                          {(classificationResult.confidence * 100).toFixed(1)}%
+                          )
                         </Text>
+                        {classificationResult.isVerifiedWaste && (
+                          <Ionicons name="checkmark-circle" size={20} color="green" />
+                        )}
                       </View>
                     )}
 
-                    {/* Loading overlay */}
                     {loading && (
                       <View style={styles.validationOverlay}>
                         <ActivityIndicator size="large" color={COLORS.white} />

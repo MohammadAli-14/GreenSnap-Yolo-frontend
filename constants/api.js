@@ -10,4 +10,6 @@
 
   // export const API_URL="https://gs-worker.onrender.com/api";
     
-  export const API_URL= "https://gs-admin.onrender.com/api";
+  // export const API_URL= "https://gs-admin.onrender.com/api";
+
+   export const API_URL= "https://yolofinalbackend.onrender.com/api";

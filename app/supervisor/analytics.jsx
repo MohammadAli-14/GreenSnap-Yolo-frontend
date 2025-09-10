@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, 
   Text, 
   ActivityIndicator, 
   StyleSheet, 
   Dimensions,
-  ScrollView 
+  ScrollView,
+  RefreshControl,
+  TouchableOpacity
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,18 +15,17 @@ import { PieChart, BarChart } from 'react-native-chart-kit';
 import useAuthStore from '../../store/authStore';
 import { API_URL } from '../../constants/api';
 import COLORS from '../../constants/colors';
-import { TouchableOpacity } from 'react-native';
 
 export default function SupervisorAnalytics() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const { token } = useAuthStore();
   const router = useRouter();
   const screenWidth = Dimensions.get('window').width;
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
-      setLoading(true);
       const response = await fetch(`${API_URL}/supervisor/profile`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -35,14 +36,21 @@ export default function SupervisorAnalytics() {
       console.error('Analytics fetch error:', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, [token]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchStats();
+  }, [fetchStats]);
 
   useEffect(() => {
+    setLoading(true);
     fetchStats();
-  }, []);
+  }, [fetchStats]);
 
-  if (loading || !stats) {
+  if (loading && !refreshing) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.primary} />
@@ -80,7 +88,17 @@ export default function SupervisorAnalytics() {
         <Text style={styles.title}>Performance Analytics</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContainer}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[COLORS.primary]}
+            tintColor={COLORS.primary}
+          />
+        }
+      >
         {/* Pie Chart */}
         <View style={styles.chartCard}>
           <Text style={styles.chartTitle}>Report Status Distribution</Text>
