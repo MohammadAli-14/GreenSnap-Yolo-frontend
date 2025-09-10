@@ -130,6 +130,3 @@ This project is licensed under the **MIT License** — see the `LICENSE` file in
 
 *Last updated: 2025-09-10*
 
-```
-::contentReference[oaicite:0]{index=0}
-```
