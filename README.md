@@ -1,50 +1,74 @@
-# Welcome to your Expo app 👋
+# GreenSnap AI — Frontend (Expo React Native)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+> Mobile frontend for **GreenSnap AI** — a cross-platform Expo app that lets citizens capture geo-tagged waste reports and submit them to the GreenSnap backend (which uses Ultralytics YOLOv11 for inference).  
+> This single `README.md` contains everything needed to run, connect, build, and contribute to the frontend.
 
-## Get started
+---
 
-1. Install dependencies
+## Table of Contents
 
-   ```bash
-   npm install
-   ```
+- [About](#about)  
+- [Features](#features)  
+- [Tech stack](#tech-stack)  
+- [Prerequisites](#prerequisites)  
+- [Quick start](#quick-start)  
+- [Environment (`.env`) — template](#environment-env---template)  
+- [API / Integration contract (examples)](#api--integration-contract-examples)  
+- [Permissions & device notes](#permissions--device-notes)  
+- [Build & release](#build--release)  
+- [Troubleshooting](#troubleshooting)  
+- [Contributing](#contributing)  
+- [License](#license)
 
-2. Start the app
+---
 
-   ```bash
-   npx expo start
-   ```
+## About
 
-In the output, you'll find options to open the app in a
+This Expo-managed React Native app is the citizen-facing client for GreenSnap AI. Users capture or upload images of litter/waste, the app attaches GPS, then submits reports to the backend for YOLOv11-based validation and lifecycle management.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+---
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Features
 
-## Get a fresh project
+- 📷 Camera capture and image upload  
+- 📍 Automatic GPS attachment to each report  
+- 🔔 Report status & lifecycle UI (pending, in-progress, resolved)  
+- 🏆 Leaderboard & basic user profile  
+- 📱 Works on Android, iOS, and Web (via Expo)
 
-When you're ready, run:
+---
+
+## Tech stack
+
+- Expo (managed) + React Native  
+- Expo Router (file-based navigation)  
+- Expo ImagePicker / Camera & Location APIs  
+- Axios / Fetch for network calls  
+- React Context / Zustand (or Redux) for state  
+- Expo SecureStore for JWT storage
+
+---
+
+## Prerequisites
+
+- Node.js (16+)  
+- npm or yarn  
+- Expo CLI (optional): `npm install -g expo-cli` or use `npx expo`  
+- Android Studio / Xcode for emulators (if needed)
+
+---
+
+## Quick start
 
 ```bash
-npm run reset-project
-```
+# 1. clone
+git clone https://github.com/MohammadAli-14/GreenSnap-Yolo-frontend.git
+cd GreenSnap-Yolo-frontend
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+# 2. install
+npm install
 
-## Learn more
+# 3. create .env (see template below)
 
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+# 4. run dev
+npx expo start
