@@ -1,4 +1,3 @@
-````markdown
 # GreenSnap AI — Frontend (Expo React Native)
 
 > Mobile frontend for **GreenSnap AI** — a cross-platform Expo app that lets citizens capture geo-tagged waste reports and submit them to the GreenSnap backend (which uses Ultralytics YOLOv11 for inference).  
@@ -76,23 +75,7 @@ npm install
 
 # 4. run in development
 npx expo start
-````
 
-Expo CLI will show options to open on a device with Expo Go, Android emulator, iOS simulator, or the web.
-
----
-
-## Environment (`.env`) — Template
-
-Create a `.env` file in the project root. **Do not** commit secrets. Expo exposes variables that begin with `EXPO_PUBLIC_` to the JS bundle.
-
-```env
-# Backend (point this to your deployed backend - Render or local)
-EXPO_PUBLIC_API_URL=https://your-backend.onrender.com
-
-# Optional: public mapping keys for map screens
-EXPO_PUBLIC_MAPS_API_KEY=              # e.g., Google Maps / Mapbox public key
-```
 
 > **Important:** Never store server-side secrets (Ultralytics API keys, DB credentials, admin secrets) in the frontend. All inference and sensitive keys must be stored and used only on the backend.
 
